@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>在庫・売上管理</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#F7F5F0;--surface:#fff;--surface2:#F0EDE6;--border:#E2DDD5;
+  --text:#1A1815;--text2:#6B6560;--text3:#9E9890;
+  --accent:#2D5016;--accent-light:#EAF3DE;--accent-mid:#639922;
+  --danger:#8B2020;--danger-light:#FCEBEB;--warn:#7A4A00;--warn-light:#FAEEDA;
+  --radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 16px;position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px}
+.header-back{width:32px;height:32px;border-radius:var(--radius-sm);border:1px solid var(--border);background:transparent;font-size:16px;cursor:pointer;display:none;align-items:center;justify-content:center;flex-shrink:0}
+.header-back.show{display:flex}
+.header-title{font-size:16px;font-weight:700;letter-spacing:-0.3px;flex:1}
+.header-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:1px}
+
+.nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{flex-shrink:0;padding:12px 18px;font-size:13px;font-weight:500;font-family:'Noto Sans JP',sans-serif;border:none;background:transparent;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+.nav-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.page{display:none;padding:16px;max-width:480px;margin:0 auto;padding-bottom:80px}
+.page.active{display:block}
+
+.stats-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px}
+.stat-label{font-size:11px;color:var(--text3);margin-bottom:4px}
+.stat-val{font-size:22px;font-weight:700;font-family:'DM Mono',monospace;letter-spacing:-0.5px}
+.stat-val.green{color:var(--accent-mid)}
+.stat-val.red{color:var(--danger)}
+
+.filter-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.filter-row::-webkit-scrollbar{display:none}
+.filter-chip{flex-shrink:0;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:500;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer}
+.filter-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+
+.acct-row{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.acct-chip{padding:7px 12px;border-radius:var(--radius-sm);font-size:12px;font-weight:500;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer}
+.acct-chip.active-all{background:var(--text);color:#fff;border-color:var(--text)}
+.acct-chip.active-mercari{background:#FF4F57;color:#fff;border-color:#FF4F57}
+.acct-chip.active-rakuma{background:#8B3CF7;color:#fff;border-color:#8B3CF7}
+.acct-chip.active-yahufuri{background:#E07800;color:#fff;border-color:#E07800}
+.acct-chip.active-snidan{background:#1565C0;color:#fff;border-color:#1565C0}
+.acct-chip.active-other{background:var(--text);color:#fff;border-color:var(--text)}
+
+.item-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;cursor:pointer}
+.item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+.item-name{font-size:14px;font-weight:700;line-height:1.4;flex:1}
+.item-brand{font-size:11px;color:var(--text3);margin-top:2px}
+.item-prices{text-align:right;flex-shrink:0}
+.item-price-sell{font-size:14px;font-weight:700;font-family:'DM Mono',monospace}
+.item-price-cost{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.item-profit{font-size:12px;font-weight:700;font-family:'DM Mono',monospace}
+.item-profit.pos{color:var(--accent-mid)}
+.item-profit.neg{color:var(--danger)}
+.item-meta{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+
+.tag{display:inline-flex;align-items:center;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:500}
+.tag-mercari{background:#FFF0F0;color:#CC2B31}
+.tag-rakuma{background:#F3EEFF;color:#6B2DC4}
+.tag-yahufuri{background:#FFF4E0;color:#8B5200}
+.tag-snidan{background:#E0F0FF;color:#0A4A8B}
+.tag-both{background:#F0EEF8;color:#4A3B7A}
+.tag-other{background:var(--surface2);color:var(--text2)}
+.tag-stock{background:var(--accent-light);color:var(--accent)}
+.tag-low{background:var(--warn-light);color:var(--warn)}
+.tag-soldout{background:#F1EFE8;color:#5F5E5A}
+
+.progress-bar{height:4px;background:var(--surface2);border-radius:99px;overflow:hidden;margin-bottom:8px}
+.progress-fill{height:100%;background:var(--accent-mid);border-radius:99px}
+.item-footer{display:flex;justify-content:space-between;align-items:center}
+.item-footer-note{font-size:11px;color:var(--text3)}
+
+/* detail */
+.detail-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.detail-name{font-size:18px;font-weight:700;margin-bottom:4px}
+.detail-sub{font-size:12px;color:var(--text3);margin-bottom:12px}
+.detail-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.ds{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 8px;text-align:center}
+.ds-label{font-size:10px;color:var(--text3);margin-bottom:3px}
+.ds-val{font-size:16px;font-weight:700;font-family:'DM Mono',monospace}
+.detail-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.detail-memo{font-size:12px;color:var(--text2);background:var(--surface2);border-radius:var(--radius-sm);padding:8px 10px;line-height:1.5;margin-bottom:10px}
+.detail-btns{display:flex;gap:8px}
+.btn-add-sale{flex:1;height:40px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;border:none;background:var(--accent);color:#fff;cursor:pointer}
+.btn-icon{height:40px;width:40px;border-radius:var(--radius-sm);font-size:16px;border:1px solid var(--border);background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.btn-icon-del{height:40px;width:40px;border-radius:var(--radius-sm);font-size:14px;border:1px solid var(--border);background:var(--surface);color:var(--danger);cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+.sec-title{font-size:12px;font-weight:700;color:var(--text3);letter-spacing:0.5px;margin-bottom:10px}
+.sale-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px}
+.sale-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.sale-plat{font-size:13px;font-weight:700}
+.sale-date{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace}
+.sale-del{width:26px;height:26px;border-radius:var(--radius-sm);font-size:11px;border:1px solid var(--border);background:transparent;color:var(--danger);cursor:pointer}
+.sale-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;row-gap:8px}
+.sn{text-align:center}
+.sn-label{font-size:10px;color:var(--text3)}
+.sn-val{font-size:12px;font-weight:700;font-family:'DM Mono',monospace}
+
+/* form */
+.form-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.form-section-title{font-size:12px;font-weight:700;color:var(--text3);letter-spacing:0.5px;margin-bottom:14px}
+.form-field{margin-bottom:12px}
+.form-field:last-child{margin-bottom:0}
+.form-label{display:block;font-size:12px;color:var(--text2);margin-bottom:5px;font-weight:500}
+.form-input{width:100%;height:40px;padding:0 12px;font-size:14px;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none}
+.form-input:focus{border-color:var(--accent)}
+.form-textarea{width:100%;padding:10px 12px;font-size:14px;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none;resize:none;min-height:72px;line-height:1.5}
+.form-textarea:focus{border-color:var(--accent)}
+.form-select{width:100%;height:40px;padding:0 12px;font-size:14px;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236B6560' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.preview-box{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;margin-top:8px;display:none}
+.preview-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0}
+.preview-label{color:var(--text2);font-size:12px}
+.preview-val{font-family:'DM Mono',monospace;font-weight:500;font-size:13px}
+.preview-divider{border:none;border-top:1px solid var(--border);margin:6px 0}
+.btn-submit{width:100%;height:46px;border-radius:var(--radius);font-size:15px;font-weight:700;font-family:'Noto Sans JP',sans-serif;border:none;background:var(--text);color:#fff;cursor:pointer;margin-top:4px}
+
+.empty{text-align:center;padding:48px 24px;color:var(--text3);font-size:14px}
+.empty-icon{font-size:32px;margin-bottom:8px}
+
+/* modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:flex-end;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;padding:20px 16px 32px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:99px;margin:0 auto 16px}
+.modal-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.modal-subtitle{font-size:13px;color:var(--text2);margin-bottom:16px;background:var(--surface2);padding:8px 12px;border-radius:var(--radius-sm);font-weight:500}
+.plat-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.plat-btn{padding:8px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer}
+.plat-btn.sel-mercari{background:#FF4F57;color:#fff;border-color:#FF4F57}
+.plat-btn.sel-rakuma{background:#8B3CF7;color:#fff;border-color:#8B3CF7}
+.plat-btn.sel-yahufuri{background:#E07800;color:#fff;border-color:#E07800}
+.plat-btn.sel-snidan{background:#1565C0;color:#fff;border-color:#1565C0}
+.plat-btn.sel-other{background:var(--text);color:#fff;border-color:var(--text)}
+.fee-row{display:flex;align-items:center;gap:8px;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:6px}
+.fee-label{font-size:12px;color:var(--text2);flex:1}
+.fee-input{width:64px;height:34px;text-align:right;padding:0 8px;font-size:15px;font-family:'DM Mono',monospace;font-weight:500;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none}
+.fee-hint{font-size:11px;color:var(--text3);margin-bottom:10px}
+.modal-actions{display:flex;gap:8px;margin-top:16px}
+.modal-cancel{flex:1;height:44px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer}
+.modal-confirm{flex:2;height:44px;border-radius:var(--radius-sm);font-size:14px;font-weight:700;font-family:'Noto Sans JP',sans-serif;border:none;background:var(--accent);color:#fff;cursor:pointer}
+
+.sold-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px}
+.sold-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.sold-name{font-size:14px;font-weight:700;flex:1;padding-right:8px}
+.sold-rev{font-size:14px;font-weight:700;font-family:'DM Mono',monospace}
+.sold-sub{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;text-align:right}
+.sold-profit{font-size:13px;font-weight:700;font-family:'DM Mono',monospace;text-align:right}
+.sold-meta{font-size:11px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+
+/* ── Korea trip ── */
+.trip-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:10px;cursor:pointer}
+.trip-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.trip-title{font-size:15px;font-weight:700}
+.trip-date{font-size:11px;color:var(--text3);font-family:'DM Mono',monospace;margin-top:2px}
+.trip-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.trip-stat{background:var(--surface2);border-radius:var(--radius-sm);padding:8px;text-align:center}
+.trip-stat-label{font-size:10px;color:var(--text3);margin-bottom:2px}
+.trip-stat-val{font-size:13px;font-weight:700;font-family:'DM Mono',monospace}
+.trip-status{display:inline-flex;align-items:center;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700}
+.trip-status-open{background:var(--warn-light);color:var(--warn)}
+.trip-status-closed{background:var(--accent-light);color:var(--accent)}
+.trip-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+
+.korea-item-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:8px}
+.korea-item-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.korea-item-name{font-size:14px;font-weight:700;flex:1}
+.korea-item-won{font-size:14px;font-weight:700;font-family:'DM Mono',monospace;color:#1565C0}
+.korea-item-jpy{font-size:12px;color:var(--text3);font-family:'DM Mono',monospace;text-align:right}
+.korea-item-meta{font-size:11px;color:var(--text3);display:flex;gap:8px;flex-wrap:wrap}
+
+.customs-box{background:var(--warn-light);border:1px solid #E8C87A;border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.customs-box.paid{background:var(--accent-light);border-color:#A8CC7A}
+.customs-title{font-size:12px;font-weight:700;color:var(--warn);margin-bottom:10px}
+.customs-title.paid{color:var(--accent)}
+.customs-rate{font-size:20px;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent);margin-top:4px}
+
+.btn-korea-add{width:100%;height:40px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;border:2px dashed var(--border);background:transparent;color:var(--text2);cursor:pointer;margin-bottom:12px}
+.btn-to-inv{width:100%;height:40px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;border:none;background:var(--accent);color:#fff;cursor:pointer;margin-top:8px}
+.btn-to-inv:disabled{background:var(--text3);cursor:default}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button class="header-back" id="back-btn" onclick="goBack()">←</button>
+  <div style="flex:1">
+    <div class="header-title" id="header-title">在庫・売上管理</div>
+    <div class="header-sub" id="header-sub"></div>
+  </div>
+</div>
+
+<nav class="nav" id="main-nav">
+  <button class="nav-btn active" onclick="showPage('inventory')">在庫一覧</button>
+  <button class="nav-btn" onclick="showPage('add')">商品追加</button>
+  <button class="nav-btn" onclick="showPage('sales')">売上集計</button>
+  <button class="nav-btn" onclick="showPage('korea')">韓国仕入れ</button>
+</nav>
+
+<!-- 在庫一覧 -->
+<div class="page active" id="page-inventory">
+  <div class="stats-row" id="inv-stats"></div>
+  <div class="acct-row" id="inv-acct-row">
+    <button class="acct-chip active-all" onclick="setInvAcct('all',this)">すべて</button>
+    <button class="acct-chip" onclick="setInvAcct('mercari',this)">メルカリ</button>
+    <button class="acct-chip" onclick="setInvAcct('rakuma',this)">ラクマ</button>
+    <button class="acct-chip" onclick="setInvAcct('yahufuri',this)">ヤフフリ</button>
+    <button class="acct-chip" onclick="setInvAcct('snidan',this)">スニダン</button>
+    <button class="acct-chip" onclick="setInvAcct('other',this)">その他</button>
+  </div>
+  <div class="filter-row">
+    <button class="filter-chip active" onclick="setInvStock('all',this)">すべて</button>
+    <button class="filter-chip" onclick="setInvStock('instock',this)">在庫あり</button>
+    <button class="filter-chip" onclick="setInvStock('low',this)">残りわずか</button>
+    <button class="filter-chip" onclick="setInvStock('soldout',this)">完売</button>
+  </div>
+  <div id="inv-list"></div>
+</div>
+
+<!-- 商品詳細 -->
+<div class="page" id="page-detail">
+  <div id="detail-content"></div>
+</div>
+
+<!-- 商品追加・編集 -->
+<div class="page" id="page-add">
+  <div class="form-section">
+    <div class="form-section-title">商品情報</div>
+    <div class="form-field">
+      <label class="form-label">商品名・モデル名 <span style="color:var(--danger)">*</span></label>
+      <input class="form-input" type="text" id="f-name" placeholder="例：Nike Dunk Low Panda">
+    </div>
+    <div class="row2">
+      <div class="form-field">
+        <label class="form-label">ブランド</label>
+        <input class="form-input" type="text" id="f-brand" placeholder="Nike">
+      </div>
+      <div class="form-field">
+        <label class="form-label">サイズ / カラー</label>
+        <input class="form-input" type="text" id="f-size" placeholder="26cm / 白黒">
+      </div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">保管場所</label>
+      <input class="form-input" type="text" id="f-location" placeholder="例：クローゼット A棚">
+    </div>
+    <div class="form-field">
+      <label class="form-label">メモ</label>
+      <textarea class="form-textarea" id="f-memo" placeholder="状態・特記事項など"></textarea>
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="form-section-title">仕入れ情報</div>
+    <div class="row2">
+      <div class="form-field">
+        <label class="form-label">仕入れ原価（円）<span style="color:var(--danger)">*</span></label>
+        <input class="form-input" type="number" id="f-cost" placeholder="12000">
+      </div>
+      <div class="form-field">
+        <label class="form-label">仕入れ数</label>
+        <input class="form-input" type="number" id="f-qty" value="1" min="1">
+      </div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">仕入れ日</label>
+      <input class="form-input" type="date" id="f-buydate">
+    </div>
+  </div>
+  <div class="form-section">
+    <div class="form-section-title">出品設定</div>
+    <div class="form-field">
+      <label class="form-label">販売予定価格（円）</label>
+      <input class="form-input" type="number" id="f-price" placeholder="18000">
+    </div>
+    <div class="form-field">
+      <label class="form-label">主な出品先</label>
+      <select class="form-select" id="f-platform">
+        <option value="メルカリ">メルカリ</option>
+        <option value="ラクマ">ラクマ</option>
+        <option value="ヤフフリ">ヤフフリ</option>
+        <option value="スニダン">スニダン</option>
+        <option value="複数">複数</option>
+        <option value="未定">未定</option>
+      </select>
+    </div>
+    <div class="preview-box" id="add-preview"></div>
+  </div>
+  <button class="btn-submit" id="add-submit-btn" onclick="addItem()">登録する</button>
+  <div style="height:24px"></div>
+</div>
+
+<!-- 売上集計 -->
+<div class="page" id="page-sales">
+  <div class="stats-row" id="sales-stats"></div>
+  <div class="acct-row" id="sales-acct-row">
+    <button class="acct-chip active-all" onclick="setSalesAcct('all',this)">すべて</button>
+    <button class="acct-chip" onclick="setSalesAcct('mercari',this)">メルカリ</button>
+    <button class="acct-chip" onclick="setSalesAcct('rakuma',this)">ラクマ</button>
+    <button class="acct-chip" onclick="setSalesAcct('yahufuri',this)">ヤフフリ</button>
+    <button class="acct-chip" onclick="setSalesAcct('snidan',this)">スニダン</button>
+    <button class="acct-chip" onclick="setSalesAcct('other',this)">その他</button>
+  </div>
+  <div id="sales-list"></div>
+</div>
+
+<!-- 韓国仕入れ一覧 -->
+<div class="page" id="page-korea">
+  <div id="korea-list"></div>
+  <button class="btn-submit" onclick="openTripModal()">＋ 新しい渡韓を追加</button>
+  <div style="height:24px"></div>
+</div>
+
+<!-- 渡韓詳細 -->
+<div class="page" id="page-trip">
+  <div id="trip-detail-content"></div>
+</div>
+
+<!-- 渡韓作成モーダル -->
+<div class="modal-overlay" id="trip-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">渡韓を追加</div>
+    <div class="form-field" style="margin-bottom:12px">
+      <label class="form-label">タイトル（例：2025年4月ソウル）</label>
+      <input class="form-input" type="text" id="trip-title" placeholder="2025年4月 ソウル">
+    </div>
+    <div class="row2">
+      <div class="form-field" style="margin-bottom:12px">
+        <label class="form-label">出発日</label>
+        <input class="form-input" type="date" id="trip-start">
+      </div>
+      <div class="form-field" style="margin-bottom:12px">
+        <label class="form-label">帰国日</label>
+        <input class="form-input" type="date" id="trip-end">
+      </div>
+    </div>
+    <div class="form-field" style="margin-bottom:12px">
+      <label class="form-label">メモ</label>
+      <input class="form-input" type="text" id="trip-memo" placeholder="例：東大門・弘大エリア">
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeTripModal()">キャンセル</button>
+      <button class="modal-confirm" onclick="confirmTrip()">作成</button>
+    </div>
+  </div>
+</div>
+
+<!-- 韓国商品追加モーダル -->
+<div class="modal-overlay" id="korea-item-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">商品を追加</div>
+    <div class="form-field" style="margin-bottom:12px">
+      <label class="form-label">商品名 *</label>
+      <input class="form-input" type="text" id="ki-name" placeholder="例：Nike Dunk Low">
+    </div>
+    <div class="row2">
+      <div class="form-field" style="margin-bottom:12px">
+        <label class="form-label">ブランド</label>
+        <input class="form-input" type="text" id="ki-brand" placeholder="Nike">
+      </div>
+      <div class="form-field" style="margin-bottom:12px">
+        <label class="form-label">サイズ / カラー</label>
+        <input class="form-input" type="text" id="ki-size" placeholder="26cm">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="form-field" style="margin-bottom:12px">
+        <label class="form-label">現地価格（ウォン）*</label>
+        <input class="form-input" type="number" id="ki-won" placeholder="150000">
+      </div>
+      <div class="form-field" style="margin-bottom:12px">
+        <label class="form-label">数量</label>
+        <input class="form-input" type="number" id="ki-qty" value="1" min="1">
+      </div>
+    </div>
+    <div class="form-field" style="margin-bottom:6px">
+      <label class="form-label">為替レート（1ウォン＝何円）*</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <input class="form-input" type="number" id="ki-rate" placeholder="0.112" step="0.001" style="flex:1">
+        <span style="font-size:13px;color:var(--text2);white-space:nowrap">円/ウォン</span>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px">※カードや両替所によって異なるレートを入力</div>
+    <div class="preview-box" id="ki-preview" style="display:block;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px"></div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="modal-cancel" onclick="closeKoreaItemModal()">キャンセル</button>
+      <button class="modal-confirm" onclick="confirmKoreaItem()">追加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 関税入力モーダル -->
+<div class="modal-overlay" id="customs-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">関税を記録する</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:14px;background:var(--surface2);padding:10px 12px;border-radius:var(--radius-sm)">帰国時に実際に支払った関税額（円）を入力してください。各商品の仕入れ原価に自動で按分されます。</div>
+    <div class="form-field" style="margin-bottom:6px">
+      <label class="form-label">支払った関税額（円）*</label>
+      <input class="form-input" type="number" id="customs-amount" placeholder="5000">
+    </div>
+    <div class="preview-box" id="customs-preview" style="display:block;background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;margin-top:8px"></div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="modal-cancel" onclick="closeCustomsModal()">キャンセル</button>
+      <button class="modal-confirm" onclick="confirmCustoms()">確定</button>
+    </div>
+  </div>
+</div>
+
+<!-- 売却モーダル -->
+<div class="modal-overlay" id="sell-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">売却を記録する</div>
+    <div class="modal-subtitle" id="modal-item-name">-</div>
+    <div class="form-field">
+      <label class="form-label">販売プラットフォーム</label>
+      <div class="plat-row">
+        <button class="plat-btn sel-mercari" id="plat-mercari" onclick="selectPlat('mercari')">メルカリ</button>
+        <button class="plat-btn" id="plat-rakuma" onclick="selectPlat('rakuma')">ラクマ</button>
+        <button class="plat-btn" id="plat-yahufuri" onclick="selectPlat('yahufuri')">ヤフフリ</button>
+        <button class="plat-btn" id="plat-snidan" onclick="selectPlat('snidan')">スニダン</button>
+        <button class="plat-btn" id="plat-other" onclick="selectPlat('other')">その他</button>
+      </div>
+    </div>
+    <div class="form-field" id="other-plat-field" style="display:none;margin-top:-4px">
+      <input class="form-input" type="text" id="modal-other-plat" placeholder="例：メルカリShops、店舗販売など">
+    </div>
+    <div class="form-field">
+      <label class="form-label">実際の売却価格（円）</label>
+      <input class="form-input" type="number" id="modal-price" placeholder="18000">
+    </div>
+    <div class="form-field">
+      <label class="form-label">手数料率（自由に変更できます）</label>
+      <div class="fee-row">
+        <span class="fee-label">販売手数料</span>
+        <input class="fee-input" type="number" id="modal-fee" value="10" min="0" max="100" step="0.1">
+        <span style="font-size:13px;color:var(--text2)">%</span>
+      </div>
+      <div class="fee-hint" id="fee-hint">※メルカリ標準手数料 10%</div>
+    </div>
+    <div class="row2">
+      <div class="form-field">
+        <label class="form-label">配送料（円）</label>
+        <input class="form-input" type="number" id="modal-shipping" placeholder="0" value="0" min="0">
+      </div>
+      <div class="form-field">
+        <label class="form-label">その他経費（円）</label>
+        <input class="form-input" type="number" id="modal-other" placeholder="0" value="0" min="0">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin:-4px 0 10px">※梱包資材・送料など利益から差し引きます</div>
+    <div class="form-field">
+      <label class="form-label">販売日</label>
+      <input class="form-input" type="date" id="modal-date">
+    </div>
+    <div class="preview-box" style="display:block" id="modal-preview"></div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="modal-confirm" onclick="confirmSell()">売却確定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const KEY = 'inv_v4';
+let items = [];
+try { items = JSON.parse(localStorage.getItem(KEY)||'[]'); } catch(e){}
+items = items.map(it => {
+  if(!it.id) it.id = String(Date.now()+Math.random());
+  if(!it.sales) {
+    it.sales = [];
+    if(it.status==='sold' && it.sellPrice) {
+      it.sales.push({ id:String(Date.now()+Math.random()), platform:it.soldPlatform||it.platform||'メルカリ', sellPrice:it.sellPrice, feeRate:it.feeRate||10, fee:it.fee||0, profit:(it.sellPrice||0)-it.cost-(it.fee||0), date:it.soldDate||'' });
+      delete it.status; delete it.sellPrice; delete it.fee; delete it.feeRate; delete it.soldPlatform; delete it.soldDate;
+    }
+  }
+  return it;
+});
+
+let invAcct='all', invStock='all', salesAcct='all';
+let sellTargetId=null, modalPlatform='mercari', currentDetailId=null, editingId=null;
+
+const FEE_DEF={mercari:10,rakuma:6,yahufuri:5.5,snidan:6,other:0};
+const FEE_HINT={mercari:'※メルカリ標準手数料 10%',rakuma:'※ラクマ標準手数料 6%（変動あり）',yahufuri:'※ヤフフリ手数料 5.5%',snidan:'※スニダン手数料（変動あり）',other:'※手数料率を手動で入力してください（0%でもOK）'};
+const PLAT={mercari:'メルカリ',rakuma:'ラクマ',yahufuri:'ヤフフリ',snidan:'スニダン',other:'その他'};
+
+function save(){try{localStorage.setItem(KEY,JSON.stringify(items))}catch(e){}}
+function fmt(n){return Math.round(n).toLocaleString('ja-JP')}
+function fmtD(d){if(!d)return '';try{return new Date(d).toLocaleDateString('ja-JP',{month:'short',day:'numeric'})}catch(e){return d}}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function getItem(id){return items.find(i=>i.id===id)}
+function soldQty(it){return(it.sales||[]).length}
+function remQty(it){return(it.qty||0)-soldQty(it)}
+function platTagCls(p){if(!p)return 'tag-other';if(p.includes('複数')||p.includes('両方'))return 'tag-both';if(p.includes('メルカリ'))return 'tag-mercari';if(p.includes('ラクマ'))return 'tag-rakuma';if(p.includes('ヤフフリ'))return 'tag-yahufuri';if(p.includes('スニダン'))return 'tag-snidan';return 'tag-other'}
+function platColor(p){if(!p)return 'var(--text2)';if(p.includes('メルカリ'))return '#CC2B31';if(p.includes('ラクマ'))return '#6B2DC4';if(p.includes('ヤフフリ'))return '#8B5200';if(p.includes('スニダン'))return '#0A4A8B';return 'var(--text2)'}
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach((b,i)=>b.classList.toggle('active',['inventory','add','sales','korea'][i]===id));
+  document.getElementById('page-'+id).classList.add('active');
+  document.getElementById('main-nav').style.display='';
+  document.getElementById('back-btn').classList.remove('show');
+  document.getElementById('header-title').textContent='在庫・売上管理';
+  document.getElementById('header-sub').textContent='';
+  if(id==='inventory')renderInventory();
+  if(id==='sales')renderSales();
+  if(id==='korea')renderKorea();
+  if(id==='add'&&!editingId){clearForm();document.getElementById('add-submit-btn').textContent='登録する';}
+}
+
+function showDetail(itemId){
+  currentDetailId=itemId;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-detail').classList.add('active');
+  document.getElementById('main-nav').style.display='none';
+  document.getElementById('back-btn').classList.add('show');
+  const it=getItem(itemId);
+  document.getElementById('header-title').textContent=it?it.name:'商品詳細';
+  document.getElementById('header-sub').textContent=it?(it.brand||''):'';
+  renderDetail(itemId);
+}
+
+function goBack(){
+  if(currentTripId){ currentTripId=null; showPage('korea'); return; }
+  currentDetailId=null;
+  document.getElementById('main-nav').style.display='';
+  document.getElementById('back-btn').classList.remove('show');
+  document.getElementById('header-sub').textContent='';
+  showPage('inventory');
+}
+
+function setInvAcct(f,btn){invAcct=f;document.querySelectorAll('#inv-acct-row .acct-chip').forEach(b=>b.className='acct-chip');btn.className='acct-chip active-'+f;renderInventory()}
+function setInvStock(f,btn){invStock=f;document.querySelectorAll('.filter-chip').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderInventory()}
+function setSalesAcct(f,btn){salesAcct=f;document.querySelectorAll('#sales-acct-row .acct-chip').forEach(b=>b.className='acct-chip');btn.className='acct-chip active-'+f;renderSales()}
+
+function renderInventory(){
+  let list=[...items];
+  if(invAcct==='mercari') list=list.filter(i=>i.platform&&i.platform.includes('メルカリ'));
+  if(invAcct==='rakuma')  list=list.filter(i=>i.platform&&i.platform.includes('ラクマ'));
+  if(invAcct==='yahufuri')list=list.filter(i=>i.platform&&i.platform.includes('ヤフフリ'));
+  if(invAcct==='snidan')  list=list.filter(i=>i.platform&&i.platform.includes('スニダン'));
+  if(invAcct==='other')   list=list.filter(i=>i.platform&&!['メルカリ','ラクマ','ヤフフリ','スニダン','複数'].some(p=>i.platform.includes(p)));
+  if(invStock==='instock')list=list.filter(i=>remQty(i)>0);
+  if(invStock==='low')    list=list.filter(i=>remQty(i)===1);
+  if(invStock==='soldout')list=list.filter(i=>remQty(i)<=0);
+
+  const allSales=items.flatMap(i=>i.sales||[]);
+  const tRev=allSales.reduce((a,s)=>a+s.sellPrice,0);
+  const tProf=allSales.reduce((a,s)=>a+s.profit,0);
+  const tCost=items.reduce((a,i)=>a+i.cost*(i.qty||0),0);
+  document.getElementById('inv-stats').innerHTML=`
+    <div class="stat"><div class="stat-label">登録商品数</div><div class="stat-val">${items.length}<span style="font-size:14px;font-family:'Noto Sans JP'"> 点</span></div></div>
+    <div class="stat"><div class="stat-label">仕入れ総額</div><div class="stat-val">¥${fmt(tCost)}</div></div>
+    <div class="stat"><div class="stat-label">売上合計</div><div class="stat-val green">¥${fmt(tRev)}</div></div>
+    <div class="stat"><div class="stat-label">純利益合計</div><div class="stat-val ${tProf>=0?'green':'red'}">¥${fmt(tProf)}</div></div>
+  `;
+  document.getElementById('header-sub').textContent=items.length+'点登録';
+
+  const el=document.getElementById('inv-list');
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">📦</div>該当する商品がありません</div>';return}
+  el.innerHTML=list.map(it=>{
+    const rem=remQty(it),sold=soldQty(it);
+    const pct=it.qty>0?Math.round(sold/it.qty*100):0;
+    const sCls=rem<=0?'tag-soldout':rem===1?'tag-low':'tag-stock';
+    const sTxt=rem<=0?'完売':`残り${rem}個`;
+    const ep=it.price-it.cost;
+    return `<div class="item-card" onclick="showDetail('${it.id}')">
+      <div class="item-top">
+        <div><div class="item-name">${esc(it.name)}</div><div class="item-brand">${esc(it.brand||'')}${it.size?' · '+esc(it.size):''}</div></div>
+        <div class="item-prices">
+          <div class="item-price-sell">¥${fmt(it.price)}</div>
+          <div class="item-price-cost">原価 ¥${fmt(it.cost)}</div>
+          <div class="item-profit ${ep>=0?'pos':'neg'}">想定利益 ¥${fmt(ep)}</div>
+        </div>
+      </div>
+      <div class="item-meta">
+        <span class="tag ${sCls}">${sTxt}</span>
+        <span class="tag ${platTagCls(it.platform)}">${esc(it.platform||'')}</span>
+        ${sold>0?`<span class="tag tag-stock">${sold}件売却済</span>`:''}
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="item-footer"><span class="item-footer-note">${it.qty}個仕入れ・${sold}個売却</span><span style="font-size:11px;color:var(--accent-mid);font-weight:700">詳細・売却履歴 →</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderDetail(itemId){
+  const it=getItem(itemId);
+  if(!it)return;
+  const rem=remQty(it),sold=soldQty(it);
+  const tRev=(it.sales||[]).reduce((a,s)=>a+s.sellPrice,0);
+  const tProf=(it.sales||[]).reduce((a,s)=>a+s.profit,0);
+  const sales=it.sales||[];
+  const salesHtml=sales.length===0
+    ?'<div class="empty" style="padding:24px"><div class="empty-icon">📋</div>まだ売却記録がありません</div>'
+    :[...sales].reverse().map(s=>{
+        const si=sales.indexOf(sales.find(x=>x.id===s.id));
+        return`<div class="sale-card">
+          <div class="sale-top">
+            <span class="sale-plat" style="color:${platColor(s.platform)}">${esc(s.platform)}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="sale-date">${s.date?fmtD(s.date):''}</span>
+              <button class="sale-del" onclick="event.stopPropagation();delSale('${it.id}','${s.id}')">✕</button>
+            </div>
+          </div>
+          <div class="sale-nums">
+            <div class="sn"><div class="sn-label">売却価格</div><div class="sn-val">¥${fmt(s.sellPrice)}</div></div>
+            <div class="sn"><div class="sn-label">手数料(${(s.feeRate||0).toFixed(1)}%)</div><div class="sn-val" style="color:var(--danger)">-¥${fmt(s.fee)}</div></div>
+            ${(s.shipping||0)>0?'<div class="sn"><div class="sn-label">配送料</div><div class="sn-val" style="color:var(--danger)">-¥'+fmt(s.shipping||0)+'</div></div>':''}
+            ${(s.other||0)>0?'<div class="sn"><div class="sn-label">その他経費</div><div class="sn-val" style="color:var(--danger)">-¥'+fmt(s.other||0)+'</div></div>':''}
+            <div class="sn"><div class="sn-label">原価</div><div class="sn-val" style="color:var(--danger)">-¥${fmt(it.cost)}</div></div>
+            <div class="sn"><div class="sn-label">利益</div><div class="sn-val" style="color:${s.profit>=0?'var(--accent-mid)':'var(--danger)'}">¥${fmt(s.profit)}</div></div>
+          </div>
+        </div>`;
+      }).join('');
+
+  document.getElementById('detail-content').innerHTML=`
+    <div class="detail-card">
+      <div class="detail-name">${esc(it.name)}</div>
+      <div class="detail-sub">${esc(it.brand||'')}${it.size?' · '+esc(it.size):''}${it.addedDate?' · 登録'+it.addedDate:''}</div>
+      <div class="detail-stats">
+        <div class="ds"><div class="ds-label">仕入数</div><div class="ds-val">${it.qty}個</div></div>
+        <div class="ds"><div class="ds-label">売却数</div><div class="ds-val" style="color:var(--accent-mid)">${sold}個</div></div>
+        <div class="ds"><div class="ds-label">残り</div><div class="ds-val" style="color:${rem<=0?'var(--text3)':rem===1?'var(--warn)':'var(--text)'}">${rem}個</div></div>
+        <div class="ds"><div class="ds-label">仕入原価</div><div class="ds-val">¥${fmt(it.cost)}</div></div>
+        <div class="ds"><div class="ds-label">売上合計</div><div class="ds-val" style="color:var(--accent-mid)">¥${fmt(tRev)}</div></div>
+        <div class="ds"><div class="ds-label">利益合計</div><div class="ds-val" style="color:${tProf>=0?'var(--accent-mid)':'var(--danger)'}">¥${fmt(tProf)}</div></div>
+      </div>
+      <div class="detail-tags">
+        <span class="tag ${platTagCls(it.platform)}">${esc(it.platform||'未定')}</span>
+        ${it.location?`<span class="tag tag-other">📍${esc(it.location)}</span>`:''}
+        ${it.buyDate?`<span class="tag tag-other">仕入 ${fmtD(it.buyDate)}</span>`:''}
+      </div>
+      ${it.memo?`<div class="detail-memo">${esc(it.memo)}</div>`:''}
+      <div class="detail-btns">
+        ${rem>0
+          ?`<button class="btn-add-sale" onclick="openSell('${it.id}')">＋ 売却を追加（残り${rem}個）</button>`
+          :`<button class="btn-add-sale" style="background:var(--text3)" disabled>完売済み</button>`}
+        <button class="btn-icon" onclick="startEdit('${it.id}')">✏️</button>
+        <button class="btn-icon-del" onclick="delItem('${it.id}')">🗑</button>
+      </div>
+    </div>
+    <div class="sec-title">売却履歴（${sales.length}件）</div>
+    ${salesHtml}
+    <div style="height:24px"></div>
+  `;
+}
+
+function renderSales(){
+  let all=[];
+  items.forEach(it=>(it.sales||[]).forEach(s=>all.push({...s,itemName:it.name,brand:it.brand,size:it.size,cost:it.cost})));
+  if(salesAcct==='mercari') all=all.filter(s=>s.platform&&s.platform.includes('メルカリ'));
+  if(salesAcct==='rakuma')  all=all.filter(s=>s.platform&&s.platform.includes('ラクマ'));
+  if(salesAcct==='yahufuri')all=all.filter(s=>s.platform&&s.platform.includes('ヤフフリ'));
+  if(salesAcct==='snidan')  all=all.filter(s=>s.platform&&s.platform.includes('スニダン'));
+  const tRev=all.reduce((a,s)=>a+s.sellPrice,0);
+  const tFee=all.reduce((a,s)=>a+s.fee,0);
+  const tProf=all.reduce((a,s)=>a+s.profit,0);
+  document.getElementById('sales-stats').innerHTML=`
+    <div class="stat"><div class="stat-label">売却件数</div><div class="stat-val">${all.length}<span style="font-size:14px;font-family:'Noto Sans JP'"> 件</span></div></div>
+    <div class="stat"><div class="stat-label">売上合計</div><div class="stat-val">¥${fmt(tRev)}</div></div>
+    <div class="stat"><div class="stat-label">純利益</div><div class="stat-val ${tProf>=0?'green':'red'}">¥${fmt(tProf)}</div></div>
+    <div class="stat"><div class="stat-label">手数料合計</div><div class="stat-val">¥${fmt(tFee)}</div></div>
+  `;
+  const el=document.getElementById('sales-list');
+  if(!all.length){el.innerHTML='<div class="empty"><div class="empty-icon">📊</div>売却記録がありません</div>';return}
+  el.innerHTML=[...all].reverse().map(s=>`
+    <div class="sold-card">
+      <div class="sold-top">
+        <div><div class="sold-name">${esc(s.itemName)}</div><div style="font-size:11px;color:var(--text3)">${esc(s.brand||'')}${s.size?' · '+esc(s.size):''}</div></div>
+        <div><div class="sold-rev">¥${fmt(s.sellPrice)}</div><div class="sold-sub">手数料 -¥${fmt(s.fee)}</div><div class="sold-profit" style="color:${s.profit>=0?'var(--accent-mid)':'var(--danger)'}">利益 ¥${fmt(s.profit)}</div></div>
+      </div>
+      <div class="sold-meta">
+        <span style="color:${platColor(s.platform)};font-weight:700">${esc(s.platform)}</span>
+        <span>手数料 ${(s.feeRate||0).toFixed(1)}%</span>
+        ${(s.shipping||0)>0?'<span>配送料 ¥'+fmt(s.shipping||0)+'</span>':''}
+        ${(s.other||0)>0?'<span>その他 ¥'+fmt(s.other||0)+'</span>':''}
+        <span>原価 ¥${fmt(s.cost)}</span>
+        ${s.date?`<span>${s.date}</span>`:''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// form
+document.getElementById('f-cost').addEventListener('input',updPrev);
+document.getElementById('f-price').addEventListener('input',updPrev);
+function updPrev(){
+  const cost=parseInt(document.getElementById('f-cost').value)||0;
+  const price=parseInt(document.getElementById('f-price').value)||0;
+  const el=document.getElementById('add-preview');
+  if(!cost&&!price){el.style.display='none';return}
+  const mF=Math.round(price*0.10),rF=Math.round(price*0.06),yF=Math.round(price*0.055);
+  el.style.display='block';
+  el.innerHTML=`
+    <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">利益シミュレーション</div>
+    <div class="preview-row"><span class="preview-label">メルカリ（10%）</span><span class="preview-val" style="color:${price-cost-mF>=0?'var(--accent-mid)':'var(--danger)'}">${price-cost-mF>=0?'+':''}¥${fmt(price-cost-mF)}</span></div>
+    <div class="preview-row"><span class="preview-label">ラクマ（6%基準）</span><span class="preview-val" style="color:${price-cost-rF>=0?'var(--accent-mid)':'var(--danger)'}">${price-cost-rF>=0?'+':''}¥${fmt(price-cost-rF)}</span></div>
+    <div class="preview-row"><span class="preview-label">ヤフフリ（5.5%）</span><span class="preview-val" style="color:${price-cost-yF>=0?'var(--accent-mid)':'var(--danger)'}">${price-cost-yF>=0?'+':''}¥${fmt(price-cost-yF)}</span></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px">※売却時に実際の手数料率を変更できます</div>
+  `;
+}
+function clearForm(){['f-name','f-brand','f-size','f-cost','f-price','f-buydate','f-location','f-memo'].forEach(id=>document.getElementById(id).value='');document.getElementById('f-qty').value='1';document.getElementById('add-preview').style.display='none'}
+function addItem(){
+  const name=document.getElementById('f-name').value.trim();
+  const brand=document.getElementById('f-brand').value.trim();
+  const size=document.getElementById('f-size').value.trim();
+  const cost=parseInt(document.getElementById('f-cost').value)||0;
+  const price=parseInt(document.getElementById('f-price').value)||0;
+  const qty=parseInt(document.getElementById('f-qty').value)||1;
+  const platform=document.getElementById('f-platform').value;
+  const buyDate=document.getElementById('f-buydate').value;
+  const location=document.getElementById('f-location').value.trim();
+  const memo=document.getElementById('f-memo').value.trim();
+  if(!name){alert('商品名を入力してください');return}
+  if(!cost){alert('仕入れ原価を入力してください');return}
+  if(editingId){
+    const it=getItem(editingId);
+    if(it)Object.assign(it,{name,brand,size,cost,price,qty,platform,buyDate,location,memo});
+    save();const id=editingId;editingId=null;clearForm();showDetail(id);
+  } else {
+    items.push({id:String(Date.now()),name,brand,size,cost,price,qty,platform,buyDate,location,memo,addedDate:new Date().toLocaleDateString('ja-JP'),sales:[]});
+    save();clearForm();showPage('inventory');
+  }
+}
+function delItem(id){
+  if(!confirm('この商品を削除しますか？\n売却履歴も削除されます。'))return;
+  items=items.filter(i=>i.id!==id);save();goBack();
+}
+function startEdit(id){
+  const it=getItem(id);if(!it)return;
+  editingId=id;
+  document.getElementById('f-name').value=it.name||'';
+  document.getElementById('f-brand').value=it.brand||'';
+  document.getElementById('f-size').value=it.size||'';
+  document.getElementById('f-cost').value=it.cost||'';
+  document.getElementById('f-price').value=it.price||'';
+  document.getElementById('f-qty').value=it.qty||1;
+  document.getElementById('f-platform').value=it.platform||'メルカリ';
+  document.getElementById('f-buydate').value=it.buyDate||'';
+  document.getElementById('f-location').value=it.location||'';
+  document.getElementById('f-memo').value=it.memo||'';
+  document.getElementById('add-submit-btn').textContent='更新する';
+  document.getElementById('main-nav').style.display='';
+  document.getElementById('back-btn').classList.remove('show');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach((b,i)=>b.classList.toggle('active',i===1));
+  document.getElementById('page-add').classList.add('active');
+  updPrev();
+}
+
+// sell modal
+function openSell(itemId){
+  sellTargetId=itemId;
+  const it=getItem(itemId);
+  document.getElementById('modal-item-name').textContent=it?it.name:'';
+  document.getElementById('modal-price').value=it?(it.price||''):'';
+  document.getElementById('modal-date').value=new Date().toISOString().slice(0,10);
+  document.getElementById('modal-shipping').value='0';
+  document.getElementById('modal-other').value='0';
+  document.getElementById('modal-other-plat').value='';
+  document.getElementById('other-plat-field').style.display='none';
+  const p=it&&it.platform||'';
+  const def=p.includes('ラクマ')&&!p.includes('メルカリ')?'rakuma':p.includes('ヤフフリ')?'yahufuri':p.includes('スニダン')?'snidan':'mercari';
+  selectPlat(def);updModal();
+  document.getElementById('sell-modal').classList.add('open');
+}
+function selectPlat(p){
+  modalPlatform=p;
+  ['mercari','rakuma','yahufuri','snidan','other'].forEach(id=>{const b=document.getElementById('plat-'+id);if(b)b.className='plat-btn'+(p===id?' sel-'+id:'')});
+  document.getElementById('modal-fee').value=FEE_DEF[p]||0;
+  document.getElementById('fee-hint').textContent=FEE_HINT[p]||'';
+  document.getElementById('other-plat-field').style.display=p==='other'?'block':'none';
+  if(p==='other')setTimeout(()=>document.getElementById('modal-other-plat').focus(),100);
+  updModal();
+}
+document.getElementById('modal-price').addEventListener('input',updModal);
+document.getElementById('modal-fee').addEventListener('input',updModal);
+document.getElementById('modal-shipping').addEventListener('input',updModal);
+document.getElementById('modal-other').addEventListener('input',updModal);
+function updModal(){
+  if(!sellTargetId)return;
+  const it=getItem(sellTargetId);if(!it)return;
+  const sp=parseInt(document.getElementById('modal-price').value)||0;
+  const fr=parseFloat(document.getElementById('modal-fee').value)||0;
+  const fee=Math.round(sp*fr/100);
+  const prof=sp-it.cost-fee;
+  document.getElementById('modal-preview').innerHTML=`
+    <div class="preview-row"><span class="preview-label">売却価格</span><span class="preview-val">¥${fmt(sp)}</span></div>
+    <div class="preview-row"><span class="preview-label">手数料（${fr.toFixed(1)}%）</span><span class="preview-val">-¥${fmt(fee)}</span></div>
+    <div class="preview-row"><span class="preview-label">仕入れ原価</span><span class="preview-val">-¥${fmt(it.cost)}</span></div>
+    <hr class="preview-divider">
+    <div class="preview-row"><span class="preview-label" style="font-weight:700">純利益</span><span class="preview-val" style="font-size:16px;color:${prof>=0?'var(--accent-mid)':'var(--danger)'}"> ${prof>=0?'+':''}¥${fmt(prof)}</span></div>
+  `;
+}
+function closeModal(){document.getElementById('sell-modal').classList.remove('open');sellTargetId=null}
+function confirmSell(){
+  if(!sellTargetId)return;
+  const sp=parseInt(document.getElementById('modal-price').value)||0;
+  if(!sp){alert('売却価格を入力してください');return}
+  const fr=parseFloat(document.getElementById('modal-fee').value)||0;
+  const fee=Math.round(sp*fr/100);
+  const shipping=parseInt(document.getElementById('modal-shipping').value)||0;
+  const other=parseInt(document.getElementById('modal-other').value)||0;
+  const it=getItem(sellTargetId);if(!it)return;
+  const dv=document.getElementById('modal-date').value;
+  const date=dv?new Date(dv).toLocaleDateString('ja-JP'):new Date().toLocaleDateString('ja-JP');
+  if(!it.sales)it.sales=[];
+  const platLabel = modalPlatform==='other'
+    ? (document.getElementById('modal-other-plat').value.trim()||'その他')
+    : (PLAT[modalPlatform]||modalPlatform);
+  it.sales.push({id:String(Date.now()),platform:platLabel,sellPrice:sp,feeRate:fr,fee,shipping,other,profit:sp-it.cost-fee-shipping-other,date});
+  save();closeModal();
+  if(currentDetailId===sellTargetId)renderDetail(sellTargetId);else renderInventory();
+}
+function delSale(itemId,saleId){
+  if(!confirm('この売却記録を削除しますか？'))return;
+  const it=getItem(itemId);if(!it||!it.sales)return;
+  it.sales=it.sales.filter(s=>s.id!==saleId);
+  save();renderDetail(itemId);
+}
+document.getElementById('sell-modal').addEventListener('click',function(e){if(e.target===this)closeModal()});
+
+// ══════════════════════════════
+// 韓国仕入れ機能
+// ══════════════════════════════
+const TRIP_KEY = 'korea_trips_v1';
+let trips = [];
+try { trips = JSON.parse(localStorage.getItem(TRIP_KEY)||'[]'); } catch(e){}
+
+let currentTripId = null;
+let koreaItemTargetTripId = null;
+let customsTargetTripId = null;
+
+function saveTrips(){ try{ localStorage.setItem(TRIP_KEY, JSON.stringify(trips)); }catch(e){} }
+function getTrip(id){ return trips.find(t=>t.id===id); }
+function tripTotalWon(trip){ return (trip.items||[]).reduce((a,i)=>a+i.won*i.qty,0); }
+function tripTotalJpy(trip){
+  const won = tripTotalWon(trip);
+  const rawJpy = (trip.items||[]).reduce((a,i)=>a+i.won*i.qty*i.rate,0);
+  const customs = trip.customs||0;
+  return rawJpy + customs;
+}
+function itemCostJpy(item, trip){
+  const rawJpy = item.won * item.qty * item.rate;
+  const totalWon = tripTotalWon(trip);
+  const customs = trip.customs||0;
+  const myShare = totalWon>0 ? (item.won*item.qty/totalWon)*customs : 0;
+  return rawJpy + myShare;
+}
+function customsRate(trip){
+  const rawJpy = (trip.items||[]).reduce((a,i)=>a+i.won*i.qty*i.rate,0);
+  if(!rawJpy||!trip.customs) return 0;
+  return (trip.customs/rawJpy)*100;
+}
+
+function renderKorea(){
+  const el = document.getElementById('korea-list');
+  if(!trips.length){ el.innerHTML='<div class="empty"><div class="empty-icon">✈️</div>渡韓記録がまだありません</div>'; return; }
+  el.innerHTML = [...trips].reverse().map(trip=>{
+    const totalWon = tripTotalWon(trip);
+    const totalJpy = tripTotalJpy(trip);
+    const rate = customsRate(trip);
+    const statusHtml = trip.customs!=null
+      ? `<span class="trip-status trip-status-closed">関税済 ${rate.toFixed(1)}%</span>`
+      : `<span class="trip-status trip-status-open">関税未入力</span>`;
+    return `<div class="trip-card" onclick="showTrip('${trip.id}')">
+      <div class="trip-header">
+        <div>
+          <div class="trip-title">${esc(trip.title)}</div>
+          <div class="trip-date">${trip.start||''}${trip.end?' → '+trip.end:''}</div>
+        </div>
+        ${statusHtml}
+      </div>
+      <div class="trip-stats">
+        <div class="trip-stat"><div class="trip-stat-label">商品数</div><div class="trip-stat-val">${(trip.items||[]).length}点</div></div>
+        <div class="trip-stat"><div class="trip-stat-label">合計（ウォン）</div><div class="trip-stat-val">₩${Math.round(totalWon).toLocaleString()}</div></div>
+        <div class="trip-stat"><div class="trip-stat-label">合計（円・関税込）</div><div class="trip-stat-val">¥${Math.round(totalJpy).toLocaleString()}</div></div>
+      </div>
+      ${trip.memo?`<div style="font-size:11px;color:var(--text3)">${esc(trip.memo)}</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function showTrip(tripId){
+  currentTripId = tripId;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-trip').classList.add('active');
+  document.getElementById('main-nav').style.display='none';
+  document.getElementById('back-btn').classList.add('show');
+  const trip = getTrip(tripId);
+  document.getElementById('header-title').textContent = trip ? trip.title : '渡韓詳細';
+  document.getElementById('header-sub').textContent = trip ? (trip.start||'') : '';
+  renderTripDetail(tripId);
+}
+
+function renderTripDetail(tripId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const items = trip.items||[];
+  const totalWon = tripTotalWon(trip);
+  const hasCost = trip.customs!=null;
+  const rate = customsRate(trip);
+
+  const customsHtml = hasCost
+    ? `<div class="customs-box paid">
+        <div class="customs-title paid">✓ 関税記録済み</div>
+        <div class="preview-row"><span class="preview-label">支払い関税額</span><span class="preview-val">¥${Math.round(trip.customs).toLocaleString()}</span></div>
+        <div class="preview-row"><span class="preview-label">実効関税率</span><span class="customs-rate">${rate.toFixed(2)}%</span></div>
+        <div class="preview-row" style="margin-top:6px"><span class="preview-label">仕入れ合計（関税込）</span><span class="preview-val" style="font-weight:700">¥${Math.round(tripTotalJpy(trip)).toLocaleString()}</span></div>
+        <button onclick="resetCustoms('${trip.id}')" style="margin-top:10px;width:100%;height:34px;border-radius:var(--radius-sm);font-size:12px;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer">関税額を修正する</button>
+      </div>`
+    : `<div class="customs-box">
+        <div class="customs-title">⚠️ 関税未入力（帰国後に入力してください）</div>
+        <div style="font-size:12px;color:var(--warn);margin-bottom:10px">関税を入力するまで仕入れ原価は為替換算のみで計算されます</div>
+        <button onclick="openCustomsModal('${trip.id}')" style="width:100%;height:36px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;border:none;background:var(--warn);color:#fff;cursor:pointer">関税額を入力する</button>
+      </div>`;
+
+  const itemsHtml = items.length===0
+    ? '<div class="empty" style="padding:24px"><div class="empty-icon">🛍️</div>商品を追加してください</div>'
+    : items.map((item,idx)=>{
+        const rawJpy = item.won * item.qty * item.rate;
+        const myShare = totalWon>0 && hasCost ? (item.won*item.qty/totalWon)*(trip.customs) : 0;
+        const totalCostJpy = rawJpy + myShare;
+        const perItemJpy = item.qty>0 ? totalCostJpy/item.qty : 0;
+        return `<div class="korea-item-card">
+          <div class="korea-item-top">
+            <div><div class="korea-item-name">${esc(item.name)}</div><div style="font-size:11px;color:var(--text3)">${esc(item.brand||'')}${item.size?' · '+esc(item.size):''}${item.qty>1?' · '+item.qty+'個':''}</div></div>
+            <div style="text-align:right">
+              <div class="korea-item-won">₩${Math.round(item.won*item.qty).toLocaleString()}</div>
+              <div class="korea-item-jpy">×${item.rate}円</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="korea-item-meta">
+              <span>為替後 ¥${Math.round(rawJpy).toLocaleString()}</span>
+              ${hasCost?`<span style="color:var(--accent)">関税按分 +¥${Math.round(myShare).toLocaleString()}</span>`:''}
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:11px;color:var(--text3)">1個あたり</div>
+              <div style="font-size:13px;font-weight:700;font-family:'DM Mono',monospace;color:var(--accent)">¥${Math.round(perItemJpy).toLocaleString()}</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            ${hasCost?`<button onclick="addToInventory('${trip.id}',${idx})" style="flex:1;height:30px;border-radius:var(--radius-sm);font-size:12px;font-weight:700;font-family:'Noto Sans JP',sans-serif;border:none;background:var(--accent);color:#fff;cursor:pointer">在庫に追加</button>`:''}
+            <button onclick="delKoreaItem('${trip.id}',${idx})" style="width:30px;height:30px;border-radius:var(--radius-sm);font-size:12px;border:1px solid var(--border);background:transparent;color:var(--danger);cursor:pointer">✕</button>
+          </div>
+        </div>`;
+      }).join('');
+
+  document.getElementById('trip-detail-content').innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px">
+      <div style="font-size:16px;font-weight:700;margin-bottom:4px">${esc(trip.title)}</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">${trip.start||''}${trip.end?' → '+trip.end:''}${trip.memo?' · '+esc(trip.memo):''}</div>
+      <div class="trip-stats">
+        <div class="trip-stat"><div class="trip-stat-label">商品数</div><div class="trip-stat-val">${items.length}点</div></div>
+        <div class="trip-stat"><div class="trip-stat-label">合計（ウォン）</div><div class="trip-stat-val">₩${Math.round(totalWon).toLocaleString()}</div></div>
+        <div class="trip-stat"><div class="trip-stat-label">仕入れ合計（円）</div><div class="trip-stat-val" style="color:var(--accent-mid)">¥${Math.round(tripTotalJpy(trip)).toLocaleString()}</div></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button onclick="delTrip('${trip.id}')" style="height:32px;padding:0 12px;border-radius:var(--radius-sm);font-size:12px;font-family:'Noto Sans JP',sans-serif;border:1px solid var(--border);background:transparent;color:var(--danger);cursor:pointer">この渡韓を削除</button>
+      </div>
+    </div>
+    ${customsHtml}
+    <div style="font-size:12px;font-weight:700;color:var(--text3);letter-spacing:0.5px;margin-bottom:10px">仕入れ商品（${items.length}点）</div>
+    ${itemsHtml}
+    <button class="btn-korea-add" onclick="openKoreaItemModal('${trip.id}')">＋ 商品を追加</button>
+    <div style="height:24px"></div>
+  `;
+}
+
+// trip modal
+function openTripModal(){
+  document.getElementById('trip-title').value='';
+  document.getElementById('trip-start').value=new Date().toISOString().slice(0,10);
+  document.getElementById('trip-end').value='';
+  document.getElementById('trip-memo').value='';
+  document.getElementById('trip-modal').classList.add('open');
+}
+function closeTripModal(){ document.getElementById('trip-modal').classList.remove('open'); }
+function confirmTrip(){
+  const title = document.getElementById('trip-title').value.trim();
+  if(!title){ alert('タイトルを入力してください'); return; }
+  const trip = {
+    id: String(Date.now()),
+    title,
+    start: document.getElementById('trip-start').value,
+    end: document.getElementById('trip-end').value,
+    memo: document.getElementById('trip-memo').value.trim(),
+    items: [],
+    customs: null
+  };
+  trips.push(trip);
+  saveTrips();
+  closeTripModal();
+  showTrip(trip.id);
+}
+function delTrip(id){
+  if(!confirm('この渡韓記録を削除しますか？
+商品データもすべて削除されます。')) return;
+  trips = trips.filter(t=>t.id!==id);
+  saveTrips();
+  goBack();
+}
+
+// korea item modal
+function openKoreaItemModal(tripId){
+  koreaItemTargetTripId = tripId;
+  document.getElementById('ki-name').value='';
+  document.getElementById('ki-brand').value='';
+  document.getElementById('ki-size').value='';
+  document.getElementById('ki-won').value='';
+  document.getElementById('ki-qty').value='1';
+  document.getElementById('ki-rate').value='';
+  document.getElementById('ki-preview').innerHTML='<span style="color:var(--text3);font-size:12px">ウォン価格と為替レートを入力すると円換算が表示されます</span>';
+  document.getElementById('korea-item-modal').classList.add('open');
+}
+function closeKoreaItemModal(){ document.getElementById('korea-item-modal').classList.remove('open'); koreaItemTargetTripId=null; }
+
+document.getElementById('ki-won').addEventListener('input', updKiPreview);
+document.getElementById('ki-qty').addEventListener('input', updKiPreview);
+document.getElementById('ki-rate').addEventListener('input', updKiPreview);
+function updKiPreview(){
+  const won = parseInt(document.getElementById('ki-won').value)||0;
+  const qty = parseInt(document.getElementById('ki-qty').value)||1;
+  const rate = parseFloat(document.getElementById('ki-rate').value)||0;
+  const el = document.getElementById('ki-preview');
+  if(!won||!rate){ el.innerHTML='<span style="color:var(--text3);font-size:12px">ウォン価格と為替レートを入力すると円換算が表示されます</span>'; return; }
+  const jpy = Math.round(won*qty*rate);
+  const perJpy = Math.round(won*rate);
+  el.innerHTML = `
+    <div class="preview-row"><span class="preview-label">現地価格合計</span><span class="preview-val" style="color:#1565C0">₩${Math.round(won*qty).toLocaleString()}</span></div>
+    <div class="preview-row"><span class="preview-label">円換算（為替のみ）</span><span class="preview-val">¥${jpy.toLocaleString()}</span></div>
+    <div class="preview-row"><span class="preview-label">1個あたり（為替のみ）</span><span class="preview-val">¥${perJpy.toLocaleString()}</span></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:4px">※帰国後に関税を入力すると確定原価が計算されます</div>
+  `;
+}
+
+function confirmKoreaItem(){
+  const name = document.getElementById('ki-name').value.trim();
+  const won = parseInt(document.getElementById('ki-won').value)||0;
+  const rate = parseFloat(document.getElementById('ki-rate').value)||0;
+  if(!name){ alert('商品名を入力してください'); return; }
+  if(!won){ alert('現地価格を入力してください'); return; }
+  if(!rate){ alert('為替レートを入力してください'); return; }
+  const trip = getTrip(koreaItemTargetTripId);
+  if(!trip) return;
+  if(!trip.items) trip.items=[];
+  trip.items.push({
+    id: String(Date.now()),
+    name,
+    brand: document.getElementById('ki-brand').value.trim(),
+    size: document.getElementById('ki-size').value.trim(),
+    won,
+    qty: parseInt(document.getElementById('ki-qty').value)||1,
+    rate
+  });
+  saveTrips();
+  closeKoreaItemModal();
+  renderTripDetail(koreaItemTargetTripId);
+}
+
+function delKoreaItem(tripId, idx){
+  if(!confirm('この商品を削除しますか？')) return;
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  trip.items.splice(idx,1);
+  saveTrips();
+  renderTripDetail(tripId);
+}
+
+// customs modal
+function openCustomsModal(tripId){
+  customsTargetTripId = tripId;
+  document.getElementById('customs-amount').value='';
+  updCustomsPreview();
+  document.getElementById('customs-modal').classList.add('open');
+}
+function closeCustomsModal(){ document.getElementById('customs-modal').classList.remove('open'); customsTargetTripId=null; }
+function resetCustoms(tripId){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  trip.customs = null;
+  saveTrips();
+  openCustomsModal(tripId);
+  renderTripDetail(tripId);
+}
+
+document.getElementById('customs-amount').addEventListener('input', updCustomsPreview);
+function updCustomsPreview(){
+  const amount = parseInt(document.getElementById('customs-amount').value)||0;
+  const tripId = customsTargetTripId;
+  const el = document.getElementById('customs-preview');
+  if(!tripId||!amount){ el.innerHTML='<span style="color:var(--text3);font-size:12px">金額を入力すると関税率が表示されます</span>'; return; }
+  const trip = getTrip(tripId);
+  if(!trip){ return; }
+  const rawJpy = (trip.items||[]).reduce((a,i)=>a+i.won*i.qty*i.rate,0);
+  const rate = rawJpy>0 ? (amount/rawJpy*100) : 0;
+  el.innerHTML = `
+    <div class="preview-row"><span class="preview-label">為替換算合計</span><span class="preview-val">¥${Math.round(rawJpy).toLocaleString()}</span></div>
+    <div class="preview-row"><span class="preview-label">関税額</span><span class="preview-val">¥${amount.toLocaleString()}</span></div>
+    <div class="preview-row"><span class="preview-label" style="font-weight:700">実効関税率</span><span class="preview-val" style="color:var(--accent);font-size:16px;font-weight:700">${rate.toFixed(2)}%</span></div>
+    <div class="preview-row"><span class="preview-label">仕入れ合計（関税込）</span><span class="preview-val" style="font-weight:700">¥${Math.round(rawJpy+amount).toLocaleString()}</span></div>
+  `;
+}
+
+function confirmCustoms(){
+  const amount = parseInt(document.getElementById('customs-amount').value)||0;
+  if(!amount){ alert('関税額を入力してください'); return; }
+  const trip = getTrip(customsTargetTripId);
+  if(!trip) return;
+  trip.customs = amount;
+  saveTrips();
+  closeCustomsModal();
+  renderTripDetail(customsTargetTripId);
+}
+
+// 在庫に追加
+function addToInventory(tripId, itemIdx){
+  const trip = getTrip(tripId);
+  if(!trip) return;
+  const ki = trip.items[itemIdx];
+  if(!ki) return;
+  const costJpy = Math.round(itemCostJpy(ki, trip)/ki.qty);
+  const name = ki.name + (ki.size?' ('+ki.size+')':'');
+  if(!confirm(`「${name}」を在庫に追加しますか？\n仕入れ原価：¥${costJpy.toLocaleString()}／個`)) return;
+  items.push({
+    id: String(Date.now()),
+    name: ki.name,
+    brand: ki.brand||'',
+    size: ki.size||'',
+    cost: costJpy,
+    price: 0,
+    qty: ki.qty,
+    platform: '未定',
+    buyDate: trip.start||'',
+    location: '',
+    memo: `韓国仕入れ（${trip.title}）₩${ki.won.toLocaleString()}×${ki.rate}円 関税按分込`,
+    addedDate: new Date().toLocaleDateString('ja-JP'),
+    sales: []
+  });
+  save();
+  alert('在庫に追加しました！\n「商品追加」タブで販売価格などを設定できます。');
+}
+
+document.getElementById('trip-modal').addEventListener('click',function(e){if(e.target===this)closeTripModal()});
+document.getElementById('korea-item-modal').addEventListener('click',function(e){if(e.target===this)closeKoreaItemModal()});
+document.getElementById('customs-modal').addEventListener('click',function(e){if(e.target===this)closeCustomsModal()});
+
+renderInventory();
+</script>
+</body>
+</html>
