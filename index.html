@@ -1007,8 +1007,7 @@ function confirmTrip(){
   showTrip(trip.id);
 }
 function delTrip(id){
-  if(!confirm('この渡韓記録を削除しますか？
-商品データもすべて削除されます。')) return;
+  if(!confirm('この渡韓記録を削除しますか？商品データもすべて削除されます。')) return;
   trips = trips.filter(t=>t.id!==id);
   saveTrips();
   goBack();
